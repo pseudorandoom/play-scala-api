@@ -47,3 +47,18 @@ Filters
 - ExampleFilter.scala
 
   A simple filter that adds a header to every response.
+
+Api
+===
+
+- Example calls:
+
+    - Create
+    curl -H "Content-Type: application/json" -X POST -d '{"name":"The Name", "place":"The Place", "start":"2016-02-15T05:00:00Z", "end":"2016-02-15T05:00:00Z"}' localhost:9000/festivities
+
+    - Update
+    curl -H "Content-Type: application/json" -X PUT -d '{"name":"Fabians event","place":"Harrison fords castle","start":"2016-02-15T05:00:00Z","end":"2016-07-03T05:00:00Z"}' localhost:9000/festivities/1000
+
+    - Query
+    curl localhost:9000/festivities/place/Bowman\'s%20joint
+    curl localhost:9000/festivities/name/Bryan\'s%20event

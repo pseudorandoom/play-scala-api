@@ -2,8 +2,7 @@ package services
 
 import java.time.Instant
 import javax.inject.{Inject, Singleton}
-import java.sql.{Date => SqlDate, PreparedStatement}
-import java.util.Date
+import java.sql.{PreparedStatement, ResultSet, Statement, Timestamp}
 
 import play.api.db.Database
 
@@ -14,22 +13,30 @@ import scala.xml.pull.{EvElemStart, EvText, XMLEventReader}
 @Singleton
 class XMLDataLoader @Inject()(db: Database) {
   val xmlReader = new XMLEventReader(Source.fromFile("conf/JAVA Test.xml"))
-  val connection = db.getConnection()
+  val connection = db.getConnection(false)
   val insertStatement = "INSERT INTO Festivities (name, place, start, end) VALUES(?, ?, ?, ?)"
   val deleteTable = "DROP TABLE IF EXISTS Festivities"
-  val createTable = "CREATE TABLE Festivities (ID bigint auto_increment, Name varchar(255), Place varchar(255), Start DATE, End DATE)"
+  val createTable = "CREATE TABLE Festivities (ID bigint auto_increment PRIMARY KEY, Name varchar(30), Place varchar(30), Start DATE, End DATE)"
   val statement = connection.createStatement()
   statement.execute(deleteTable)
   statement.execute(createTable)
   load(xmlReader)
   connection.commit()
 
-  private def insert(map: Map[String, String], preparedStmt: PreparedStatement): Unit = {
-    preparedStmt.setString(1, map.getOrElse("name", null))
-    preparedStmt.setString(2, map.getOrElse("place", null))
-    preparedStmt.setDate(3, new SqlDate(Date.from(Instant.parse(map.getOrElse("start", null))).getTime))
-    preparedStmt.setDate(4, new SqlDate(Date.from(Instant.parse(map.getOrElse("end", null))).getTime))
-    preparedStmt.addBatch()
+  private def setStatementValues(map: Map[String, Any], preparedStmt: PreparedStatement): Unit = {
+    preparedStmt.setString(1, map.get("name").map(_.toString).getOrElse(null))
+    preparedStmt.setString(2, map.get("place").map(_.toString).getOrElse(null))
+    preparedStmt.setTimestamp(3, Timestamp.from(Instant.parse(map.get("start").map(_.toString).getOrElse(null))))
+    preparedStmt.setTimestamp(4, Timestamp.from(Instant.parse(map.get("end").map(_.toString).getOrElse(null))))
+  }
+
+  private def setStatementValues(f: Festivity, preparedStmt: PreparedStatement): Unit = {
+    setStatementValues(Map(
+      "name" -> f.name,
+      "place" -> f.place,
+      "start" -> f.start,
+      "end" -> f.end
+    ), preparedStmt)
   }
 
   private def load(reader: XMLEventReader): Unit = {
@@ -37,7 +44,8 @@ class XMLDataLoader @Inject()(db: Database) {
     @tailrec
     def loop(map: Map[String, String]): Unit = {
       if (map.size == 4) {
-        insert(map, preparedStmt)
+        setStatementValues(map, preparedStmt)
+        preparedStmt.addBatch()
         loop(Map.empty)
       } else if (reader.hasNext) {
         val isText = (label:String) => label == "name" || label == "place" || label == "start" || label == "end"
@@ -45,27 +53,63 @@ class XMLDataLoader @Inject()(db: Database) {
           case EvElemStart(_, label, _, _) => if (isText(label)) loop(map + (label -> (reader.next() match {case EvText(t) => t}))) else loop(map)
           case _ => loop(map)
         }
-      } else {
-        loop(map)
       }
     }
     loop(Map.empty)
     preparedStmt.executeBatch()
   }
 
-  def getAll(): List[Festivity] = {
-    val stmt = connection.createStatement()
-    val rs = stmt.executeQuery("SELECT * FROM Festivities")
+  private def readAsList(rs: ResultSet): List[Festivity] = {
+    @tailrec
     def loop(ls: List[Festivity]): List[Festivity] = {
       if(rs.next()) {
         val id = rs.getLong(1)
         val name = rs.getString(2)
         val place = rs.getString(3)
-        val start = rs.getDate(4)
-        val end = rs.getDate(5)
-        Festivity(id, name, place, start, end)::ls
+        val start = rs.getTimestamp(4)
+        val end = rs.getTimestamp(5)
+        loop(Festivity(id, name, place, start.toInstant, end.toInstant)::ls)
       } else ls
     }
     loop(List.empty)
+  }
+
+  def getAll(): List[Festivity] = {
+    val stmt = connection.createStatement()
+    val rs = stmt.executeQuery("SELECT * FROM Festivities")
+    val list = readAsList(rs)
+    connection.commit()
+    list
+  }
+
+  def save(f: Festivity): Festivity = {
+    val stmt = connection.prepareStatement(insertStatement, Statement.RETURN_GENERATED_KEYS)
+    setStatementValues(f, stmt)
+    stmt.executeUpdate()
+    val generated = stmt.getGeneratedKeys
+    generated.next
+    println(s"generated $generated")
+    val id = generated.getLong(1)
+    connection.commit()
+    f.setId(id)
+  }
+
+  def update(f: Festivity): Festivity = {
+    val updateStatement = "UPDATE Festivities SET name=?, place=?, start=?, end=? WHERE ID = ?"
+    val stmt = connection.prepareStatement(updateStatement)
+    setStatementValues(f, stmt)
+    stmt.setLong(5, f.id)
+    stmt.executeUpdate()
+    connection.commit()
+    f
+  }
+
+  def query(field: String, value: String): List[Festivity] = {
+    val stmt = connection.prepareStatement("SELECT * FROM Festivities WHERE " + field + "=?")
+    stmt.setString(1, value)
+    val results = stmt.executeQuery()
+    val list = readAsList(results)
+    connection.commit()
+    list
   }
 }

@@ -8,7 +8,11 @@ GET     /                           controllers.HomeController.index
 GET     /count                      controllers.CountController.count
 # An example controller showing how to write asynchronous code
 GET     /message                    controllers.AsyncController.message
-GET     /asdf                       controllers.FestivitiesController.getAll
+GET     /festivities                controllers.FestivitiesController.getAll
+POST    /festivities                controllers.FestivitiesController.create
+PUT     /festivities/:id            controllers.FestivitiesController.update(id: Long)
+GET     /festivities/place/:value   controllers.FestivitiesController.query(field = "place", value)
+GET     /festivities/name/:value    controllers.FestivitiesController.query(field = "name", value)
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.versioned(path="/public", file: Asset)
