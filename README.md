@@ -7,6 +7,11 @@ Required software
 - Scala 2.11.7 ~ 2.11.8
 - Activator ~1.3.7
 
+Execution
+=========
+
+- to run the project from the command line cd into the project directory and run `activator run`
+
 Api
 ===
 
