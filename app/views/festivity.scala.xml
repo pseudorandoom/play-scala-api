@@ -1,0 +1,8 @@
+@(f:services.Festivity)
+<?xml version="1.0" encoding="utf-8"?>
+<festivity>
+    <name>@f.name</name>
+    <place>@f.place</place>
+    <start>@f.start</start>
+    <end>@f.end</end>
+</festivity>

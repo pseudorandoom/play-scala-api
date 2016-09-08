@@ -2,17 +2,14 @@
 # This file defines all application routes (Higher priority routes first)
 # ~~~~
 
-# An example controller showing a sample home page
-GET     /                           controllers.HomeController.index
-# An example controller showing how to use dependency injection
-GET     /count                      controllers.CountController.count
-# An example controller showing how to write asynchronous code
-GET     /message                    controllers.AsyncController.message
 GET     /festivities                controllers.FestivitiesController.getAll
 POST    /festivities                controllers.FestivitiesController.create
 PUT     /festivities/:id            controllers.FestivitiesController.update(id: Long)
 GET     /festivities/place/:value   controllers.FestivitiesController.query(field = "place", value)
 GET     /festivities/name/:value    controllers.FestivitiesController.query(field = "name", value)
+GET     /festivities/start/:instant controllers.FestivitiesController.queryTime(field = "start", instant)
+GET     /festivities/end/:instant   controllers.FestivitiesController.queryTime(field = "end", instant)
+GET     /festivities/between/:start/:end controllers.FestivitiesController.between(start, end)
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.versioned(path="/public", file: Asset)

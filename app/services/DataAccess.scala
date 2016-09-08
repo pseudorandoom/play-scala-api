@@ -11,7 +11,7 @@ import scala.io.Source
 import scala.xml.pull.{EvElemStart, EvText, XMLEventReader}
 
 @Singleton
-class XMLDataLoader @Inject()(db: Database) {
+class DataAccess @Inject()(db: Database) {
   val xmlReader = new XMLEventReader(Source.fromFile("conf/JAVA Test.xml"))
   val connection = db.getConnection(false)
   val insertStatement = "INSERT INTO Festivities (name, place, start, end) VALUES(?, ?, ?, ?)"
@@ -88,7 +88,6 @@ class XMLDataLoader @Inject()(db: Database) {
     stmt.executeUpdate()
     val generated = stmt.getGeneratedKeys
     generated.next
-    println(s"generated $generated")
     val id = generated.getLong(1)
     connection.commit()
     f.setId(id)
@@ -105,8 +104,27 @@ class XMLDataLoader @Inject()(db: Database) {
   }
 
   def query(field: String, value: String): List[Festivity] = {
+    query(field)(value)((p, v, i) => p.setString(i, v))
+  }
+
+  def query(field: String, value: Instant): List[Festivity] = {
+    query(field)(value)((p, v, i) => p.setTimestamp(i, Timestamp.from(v)))
+  }
+
+  def queryDateRange(start: Instant, end: Instant): List[Festivity] = {
+    val stmt = connection.prepareStatement("SELECT * FROM Festivities WHERE start >= ? AND end <= ?")
+    stmt.setTimestamp(1, Timestamp.from(start))
+    stmt.setTimestamp(2, Timestamp.from(end))
+    val result = stmt.executeQuery()
+    val list = readAsList(result)
+    connection.commit()
+    list
+  }
+
+  // curried for better type inference
+  private def query[T](field: String)(value: T)(b: (PreparedStatement, T, Int) => Unit): List[Festivity] = {
     val stmt = connection.prepareStatement("SELECT * FROM Festivities WHERE " + field + "=?")
-    stmt.setString(1, value)
+    b(stmt, value, 1)
     val results = stmt.executeQuery()
     val list = readAsList(results)
     connection.commit()
